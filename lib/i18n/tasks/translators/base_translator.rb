@@ -92,7 +92,7 @@ module I18n::Tasks
         end
       end
 
-      INTERPOLATION_KEY_RE = /%\{[^}]+}/|:.*:
+      INTERPOLATION_KEY_RE = /%\{[^}]+}|:.*:/
       UNTRANSLATABLE_STRING = 'zxzxzx'
 
       # @param [String] value
