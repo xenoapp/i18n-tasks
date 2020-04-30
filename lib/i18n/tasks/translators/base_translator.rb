@@ -38,6 +38,7 @@ module I18n::Tasks
           result
         end
         puts "Done! Writing stuff (may take a while)"
+        forest
       end
 
       protected
