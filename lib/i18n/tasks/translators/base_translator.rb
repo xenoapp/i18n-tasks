@@ -14,7 +14,7 @@ module I18n::Tasks
       def translate_forest(forest, from)
         sleep_span = 90
 
-        forest.inject @i18n_tasks.empty_forest do |result, root|
+        forest = forest.inject @i18n_tasks.empty_forest do |result, root|
           if root.key != from
             puts "Translating #{root.key}..."
             retries = 0
