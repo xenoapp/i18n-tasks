@@ -11,229 +11,150 @@ module I18n::Tasks
             pos:  '[locales key value]',
             desc: "Creates or replaces an existing key if it exists in the locales files"
 
-        def is_new_key(split)
-          return false if @in_key && split.select { |s| s.blank? }.count > @current_scope.count
-          split = split.last.split(":")
-          parsed = [split.first]
-          split.shift
-          parsed.push(split.join(":"))
-          return true if parsed.first.count("'") == 2 && parsed.first[0] == "'" && parsed.first[-1] == "'" && ["'yes'", "'no'", "'true'", "'false'"].include?(parsed.first)
-          return parsed.first.count(" \n\t\"'") == 0 && !parsed.second.blank?
+        def log(str)
+          puts "[ I18n-tasks ] #{str}"
         end
 
-        def update_tree(key_buffer = nil, value_buffer = nil)
-          if key_buffer
-            tmp = key_buffer.split(":")
-            key = tmp.last
-            current_scope = tmp.first tmp.count - 1
-            value = value_buffer
-          else
-            key = @key
-            value = @value
-            current_scope = @current_scope
-          end
-          if !key.blank? && !value.blank?
-            anchor = @tree
-            current_scope.each { |scope|
-              anchor[scope] = {} if anchor[scope].nil?
-              anchor = anchor[scope]
+        def update_backups(force_backup = false)
+          log("Updating backups") if force_backup
+          system("mkdir i18n_backups") if !File.exist?("i18n_backups")
+          i18n.locales.each { |locale|
+            i18n.data.config[:read].each { |path|
+              path = path.gsub("%{locale}", locale)
+              dir = path.split("/")
+              dir = dir.first(dir.size - 1).join("/")
+              backup_dir = dir.gsub("config/locales", "i18n_backups")
+              system("mkdir #{backup_dir}") if !File.exist?(backup_dir)
+              backup_path = path.gsub("config/locales", "i18n_backups")
+              system("cp #{path} #{backup_path}") if force_backup || !File.exist?("#{backup_path}")
             }
-            anchor[key] = value
-          end
-        end
-
-        def is_new_scope(split)
-          return false if @in_key && split.select { |s| s.blank? }.count > @current_scope.count
-          return split.last[-1] == ":" && split.last.count(":") == 1 && split.last.count(" \n\t\"'") == 0
-        end
-
-        def is_different_scope(count)
-          return @current_scope.count != count
-        end
-
-        def go_to_previous_scope(count)
-          @current_scope = count == 0 ? [] : @current_scope.first(count)
-        end
-
-        def is_in_key
-          return true if @value == "|-" || @value == "|+"
-          return true if @value.size == 1 && @value[0] == "'"
-          return  @value[0] == "'" && @value[-1] != "'"
-        end
-
-        def update_with_new_scope(count, split)
-          if count > @current_scope.count - 1 || @current_scope.count == 0
-            @current_scope.push(@key)
-          elsif count < @current_scope.count
-            @current_scope = count == 0 ? [] : @current_scope.first(count)
-            @current_scope.push(@key)
-          end
-        end
-
-        def generate_key_value(new_key, new_scope, split, key_buffer, value_buffer)
-          if @in_key && !new_key && !new_scope
-            @key = nil
-            @value = split.last
-          else
-            tmp = split.last.split(":")
-            @key = tmp.first
-            tmp.shift
-            @value = tmp.join(":")
-            @value = @value == "" ? "" : @value[1,@value.size - 1]
-          end
-        end
-
-        def write_tree(spaces, section = nil)
-          section.each { |k, v|
-            if v.is_a? Hash
-              @file.write("#{spaces}#{k}:\n")
-              write_tree(spaces + "  ", v)
-            else
-              @file.write("#{spaces}#{k}: #{v}\n")
-            end
           }
         end
 
-        def get_split(line)
-          split = line.split("  ")
-          if split.count > 0
-            tmp = []
-            tmp_split = split.dup
-            tmp_count = 0
-            tmp_count += 1 while tmp_split[tmp_count].blank?
-            if tmp_count + 1 != tmp_split.count
-              tmp.push(tmp_split.shift) while tmp_split.first.blank?
-              tmp_last = []
-              tmp_last.push(tmp_split.shift) while tmp_split.count > 0
-              tmp.push(tmp_last.join("  "))
-              split = tmp
-            end
-          end
-          return split
+        def get_forests
+          log("Retrieving current forest...")
+          @current_forest = i18n.data_forest
+          log("Retrieving backup forest...")
+          @backup_forest = I18n::Tasks::BaseTask.new({
+            data: {
+              read: i18n.data.config[:read].map { |p| p.gsub("config/locales", "i18n_backups") },
+              write: i18n.data.config[:write].map { |p| p.gsub("config/locales", "i18n_backups") },
+            }
+          }).data_forest
         end
 
-        def get_tree(file_path)
-          file = File.open(file_path)
-          data = file.readlines
-          @tree = {}
-          @current_scope = []
-          @in_key = false
-          key_buffer = ""
-          value_buffer = ""
-          count_buffer = 0
-          data.each { |line|
-            line = line[0, line.size - 1]
-            if line != "---"
-              split = get_split(line)
-              new_key = split.count > 0 ? is_new_key(split) : nil
-              new_scope = split.count > 0 ? is_new_scope(split) : nil
+        def get_keys_from_forest(type, node)
+          if node.children.nil?
+            @keys[type][node.full_key] = node.value
+          else
+            node.children.each { |subnode|
+              get_keys_from_forest(type, subnode)
+            }
+          end
+        end
 
-              if !new_key.nil? && !new_scope.nil?
-                generate_key_value(new_key, new_scope, split, key_buffer, value_buffer)
-                count = split.select { |s| s.blank? }.count
-                can_update_tree = false
-                can_update_buffer = true
+        def check_differences
+          @differing = []
+          @removed = []
+          @added = []
+          @keys[:current].each { |k, v|
+            cleaned = k.split(".")
+            cleaned.shift
+            @differing.push(cleaned.join(".")) if !@keys[:backup][k].nil? && @keys[:backup][k] != v
+          }
+          @keys[:backup].each { |k, v|
+            cleaned = k.split(".")
+            cleaned.shift
+            @removed.push(cleaned.join(".")) if @keys[:current][k].nil?
+          }
+          @keys[:current].each { |k, v|
+            cleaned = k.split(".")
+            cleaned.shift
+            @added.push(cleaned.join(".")) if @keys[:backup][k].nil?
+          }
+        end
 
-                if new_scope
-                  update_with_new_scope(count, split)
-                  if @in_key
-                    update_tree(key_buffer, value_buffer)
-                    @in_key = false
-                  end
-                elsif new_key && is_different_scope(count)
-                  go_to_previous_scope(count)
-                  if @in_key
-                    update_tree(key_buffer, value_buffer)
-                    @in_key = false
-                  end
-                end
+        def get_differing_keys
+          @keys = {
+            current: {},
+            backup: {}
+          }
+          get_keys_from_forest(:current, @current_forest.get(@base_locale))
+          get_keys_from_forest(:backup, @backup_forest.get(@base_locale))
+          check_differences
+        end
 
-                if new_key
-                  update_tree(key_buffer, value_buffer) if @in_key == true
+        def process_differing_keys
+          @locales = i18n.locales
 
-                  @in_key = is_in_key
-                  value_buffer = @in_key ? @value : ""
-
-                  key_buffer = @in_key ? ("#{@current_scope.join(":")}:#{@key}") : ""
-                  count_buffer = @in_key ? count : 0
-                  can_update_tree = true
-                  can_update_buffer = !@in_key
-                end
-
-                if !@in_key
-                  update_tree if can_update_tree
-                else
-                  value_buffer = value_buffer + "\n" + line if can_update_buffer
-                end
-              else
-                value_buffer = value_buffer + "\n" + line if @in_key
+          log("Found #{@differing.count} differing keys:")
+          @differing.each { |k|
+            log("  - #{k}")
+          }
+          log("Found #{@added.count} added keys:")
+          @added.each { |k|
+            log("  - #{k}")
+          }
+          log("Found #{@removed.count} removed keys:")
+          @removed.each { |k|
+            log("  - #{k}")
+          }
+          puts ""
+          i = 0
+          @locales.each { |locale|
+            i += 1
+            if locale != @base_locale
+              log("#{locale} (#{i} / #{@locales.count}):")
+              if @differing.count > 0
+                log("  Removing differing keys...")
+                @differing.each { |k|
+                 @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
+                }
+              end
+              if @removed.count > 0
+                log("  Removing removed keys...")
+                @removed.each { |k|
+                 @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
+                }
               end
             end
+            log("  Rewriting locale...")
+            i18n.data.set(locale, @current_forest.get(locale))
           }
-        end
-
-        def rewrite_tree(file_path)
-          tmp_file = file_path.gsub("/", "_")
-          @file = File.open("/tmp/#{tmp_file}", "w")
-          @file.write("---\n#{@locale}:\n")
-          write_tree("  ", @tree[@locale])
-          @file.close
-          system("mv #{file_path} /tmp/backup_#{tmp_file} && cp /tmp/#{tmp_file} #{file_path}")
-        end
-
-        def tree_contains(key)
-          anchor = @tree[@locale]
-          key.each { |k|
-            return false if anchor[k].nil?
-            anchor = anchor[k]
-          }
-          return true
-        end
-
-        def put_in_tree(key, value)
-          if tree_contains(key)
-            puts "WARNING: #{key.join(".")} already exists, replacing it"
+          if can_translate
+            missing = i18n.missing_diff_forest i18n.locales, @base_locale
+            log("Adding and translating added keys...")
+            translated = i18n.translate_forest missing, from: @base_locale, backend: :google
+            @current_forest.merge! translated
+          else
+            log("  Skipping translate")
           end
-          anchor = @tree[@locale]
-          key.first(key.count - 1).each { |k|
-            anchor[k] = {} if anchor[k].nil?
-            anchor = anchor[k]
-          }
-          quotes = value.count("!") > 0 ? "'" : ""
-          anchor[key.last] = ""
+        end
 
-          split_value = value.split("\n")
-          spacing = ""
-          if split_value.count > 1
-            anchor[key.last] = "|-\n"
-            spacing = "  " * (key.count + 1)
-          end
-          split_value.each { |v|
-            anchor[key.last] += "#{spacing}#{v}\n"
+        def can_translate
+          return @translate.nil? || @translate == true
+        end
+
+        def parse_arguments(opt)
+          @translate = true
+          @base_locale = "en"
+          opt.each { |arg|
+            split = arg.split("=")
+            instance_variable_set("@#{split.first}", split.second == "true" || split.second == "false" ? split.second == "true" : split.second)
           }
-          anchor[key.last] = "#{quotes}#{anchor[key.last][0,anchor[key.last].size - 1]}#{quotes}"
-          puts "=> #{key.join(".")}"
         end
 
         def update(opt = {})
-          section = opt[:arguments].first
-          locales = opt[:arguments].second.split(',')
-          key = opt[:arguments].third.split(".")
-          value = opt[:arguments].fourth
+          parse_arguments(opt[:arguments])
+          update_backups(false)
+          get_forests
+          get_differing_keys
+          return if @differing.count == 0 && @added.count == 0 && @removed.count == 0
+          process_differing_keys
 
-          locales.each { |locale|
-            @locale = locale
-            i18n.data.config[:read].each { |file_path|
-              file_path = file_path.sub("%{locale}", locale)
-              if file_path.match(section)
-                get_tree(file_path)
-                put_in_tree(key, value)
-                rewrite_tree(file_path)
-                return
-              end
-            }
-          }
-          puts "Unknown section <#{section}>"
+          log("Writing everything back to the files (this will take a while)...")
+          i18n.data.write @current_forest
+          update_backups(true)
         end
       end
     end
