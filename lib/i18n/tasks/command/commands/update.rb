@@ -5,7 +5,7 @@ require 'pry'
 module I18n::Tasks
   module Command
     module Commands
-      module Add
+      module Update
         include Command::Collection
         cmd :update,
             pos:  '[locales key value]',
