@@ -113,13 +113,13 @@ module I18n::Tasks
                   something_changed = true
                 }
               end
-              if @removed.count > 0
-                log("  Removing removed keys...")
-                @removed.each { |k|
-                  @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
-                  something_changed = true
-                }
-              end
+            end
+            if @removed.count > 0
+              log("  Removing removed keys...")
+              @removed.each { |k|
+                @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
+                something_changed = true
+              }
             end
             if something_changed
               log("  Rewriting locale...")
@@ -161,7 +161,7 @@ module I18n::Tasks
           log("Writing everything back to the files (this will take a while)...")
           i18n.data.write @current_forest
           update_backups(true)
-          log("Running js export (will also take a while...")
+          log("Running js export (will also take a while)...")
           system("rake i18n:js:export")
         end
       end
