@@ -1,5 +1,5 @@
 # frozen_string_literal: true
-
+0;276;0c
 require 'pry'
 
 module I18n::Tasks
@@ -101,29 +101,31 @@ module I18n::Tasks
           }
           puts ""
           i = 0
+          log("Translation disabled, won't remove differing keys from other files") if !@translate
           @locales.each { |locale|
             i += 1
-            if locale != @base_locale
-              log("#{locale} (#{i} / #{@locales.count}):")
-              if @translate == true
-                if @differing.count > 0
-                  log("  Removing differing keys...")
-                  @differing.each { |k|
-                    @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
-                  }
-                end
-              else
-                log("Translation disabled, won't remove differing keys from other files")
+            something_changed = false
+            log("#{locale} (#{i} / #{@locales.count}):")
+            if @translate == true
+              if @differing.count > 0
+                log("  Removing differing keys...")
+                @differing.each { |k|
+                  @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
+                  something_changed = true
+                }
               end
               if @removed.count > 0
                 log("  Removing removed keys...")
                 @removed.each { |k|
                   @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
+                  something_changed = true
                 }
               end
             end
-            log("  Rewriting locale...")
-            i18n.data.set(locale, @current_forest.get(locale))
+            if something_changed
+              log("  Rewriting locale...")
+              i18n.data.set(locale, @current_forest.get(locale))
+            end
           }
           if can_translate
             log("Able to translate, retrieving differing forest (will take a little while")
