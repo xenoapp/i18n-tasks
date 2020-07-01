@@ -10,6 +10,10 @@ module I18n::Tasks
             pos:  '[locales key value]',
             desc: "Creates or replaces an existing key if it exists in the locales files"
 
+        cmd :remove,
+            pos: '[key...]'
+            desc: 'removes key'
+
         def log(str)
           puts "[ I18n-tasks ] #{str}"
         end
@@ -100,19 +104,17 @@ module I18n::Tasks
           }
           puts ""
           i = 0
-          log("Translation disabled, won't remove differing keys from other files") if !@translate
+          log("Translation disabled, will set differing / removed keys to #{@base_locale}") if !@translate
           @locales.each { |locale|
             i += 1
             something_changed = false
             log("#{locale} (#{i} / #{@locales.count}):")
-            if @translate == true
-              if @differing.count > 0
-                log("  Removing differing keys...")
+            if @differing.count > 0
+              log("  Removing differing keys...")
                 @differing.each { |k|
-                  @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
-                  something_changed = true
-                }
-              end
+                @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
+                something_changed = true
+              }
             end
             if @removed.count > 0
               log("  Removing removed keys...")
@@ -126,19 +128,29 @@ module I18n::Tasks
               i18n.data.set(locale, @current_forest.get(locale))
             end
           }
-          if can_translate
+          if @translate
             log("Able to translate, retrieving differing forest (will take a little while")
             missing = i18n.missing_diff_forest i18n.locales, @base_locale
             log("Adding and translating added keys...")
             translated = i18n.translate_forest missing, from: @base_locale, backend: :google
             @current_forest.merge! translated
           else
-            log("  Skipping translate")
-          end
-        end
+            binding.pry
+            # log("Setting every differing / removed key to #{@base_locale}...")
+            # data = {}
+            # @differing.each { |k|
+            #   k = "en.#{k}"
 
-        def can_translate
-          return @translate.nil? || @translate == true
+            # }
+
+            # @locales.each { |locale|
+            #   @differing.each { |k|
+            #     k = "#{locale}.#{k}"
+            #     node = I18n::Tasks::Data::Tree::Node.new(key: k, value: )
+            #   }
+            #   @current_forest.set()
+            # }
+          end
         end
 
         def parse_arguments(opt)

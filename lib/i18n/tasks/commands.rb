@@ -11,6 +11,7 @@ require 'i18n/tasks/command/commands/data'
 require 'i18n/tasks/command/commands/tree'
 require 'i18n/tasks/command/commands/meta'
 require 'i18n/tasks/command/commands/update'
+require 'i18n/tasks/command/commands/remove'
 require 'i18n/tasks/command/commander'
 
 module I18n::Tasks
@@ -25,6 +26,7 @@ module I18n::Tasks
     include Command::Commands::Tree
     include Command::Commands::Meta
     include Command::Commands::Update
+    include Command::Commands::Remove
 
     require 'highline/import'
   end
