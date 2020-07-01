@@ -1,5 +1,4 @@
 # frozen_string_literal: true
-0;276;0c
 require 'pry'
 
 module I18n::Tasks
