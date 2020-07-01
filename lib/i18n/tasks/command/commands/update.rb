@@ -105,16 +105,20 @@ module I18n::Tasks
             i += 1
             if locale != @base_locale
               log("#{locale} (#{i} / #{@locales.count}):")
-              if @differing.count > 0
-                log("  Removing differing keys...")
-                @differing.each { |k|
-                 @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
-                }
+              if @translate == true
+                if @differing.count > 0
+                  log("  Removing differing keys...")
+                  @differing.each { |k|
+                    @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
+                  }
+                end
+              else
+                log("Translation disabled, won't remove differing keys from other files")
               end
               if @removed.count > 0
                 log("  Removing removed keys...")
                 @removed.each { |k|
-                 @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
+                  @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
                 }
               end
             end
@@ -122,6 +126,7 @@ module I18n::Tasks
             i18n.data.set(locale, @current_forest.get(locale))
           }
           if can_translate
+            log("Able to translate, retrieving differing forest (will take a little while")
             missing = i18n.missing_diff_forest i18n.locales, @base_locale
             log("Adding and translating added keys...")
             translated = i18n.translate_forest missing, from: @base_locale, backend: :google
@@ -155,6 +160,8 @@ module I18n::Tasks
           log("Writing everything back to the files (this will take a while)...")
           i18n.data.write @current_forest
           update_backups(true)
+          log("Running js export (will also take a while...")
+          system("rake i18n:js:export")
         end
       end
     end
