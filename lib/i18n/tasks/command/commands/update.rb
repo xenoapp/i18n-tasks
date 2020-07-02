@@ -99,32 +99,35 @@ module I18n::Tasks
             update_log("  - #{k}")
           }
           puts ""
-          i = 0
-          @locales.each { |locale|
-            i += 1
-            if locale != @base_locale
-              something_changed = false
-              update_log("#{locale} (#{i} / #{@locales.count}):")
-              if @differing.count > 0
-                update_log("  Removing differing keys...")
-                  @differing.each { |k|
-                  @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
-                  something_changed = true
-                }
+
+          if @differing.count > 0 || @removed.count > 0
+            i = 0
+            @locales.each { |locale|
+              i += 1
+              if locale != @base_locale
+                something_changed = false
+                update_log("#{locale} (#{i} / #{@locales.count}):")
+                if @differing.count > 0
+                  update_log("  Removing differing keys...")
+                    @differing.each { |k|
+                    @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
+                    something_changed = true
+                  }
+                end
+                if @removed.count > 0
+                  update_log("  Removing removed keys...")
+                  @removed.each { |k|
+                    @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
+                    something_changed = true
+                  }
+                end
+                if something_changed
+                  update_log("  Rewriting locale after removing...")
+                  i18n.data.set(locale, @current_forest.get(locale))
+                end
               end
-              if @removed.count > 0
-                update_log("  Removing removed keys...")
-                @removed.each { |k|
-                  @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
-                  something_changed = true
-                }
-              end
-              if something_changed
-                update_log("  Rewriting locale after removing...")
-                i18n.data.set(locale, @current_forest.get(locale))
-              end
-            end
-          }
+            }
+          end
           if @translate
             update_log("Retrieving differing forest (will take a little while")
             missing = i18n.missing_diff_forest i18n.locales, @base_locale
@@ -144,6 +147,7 @@ module I18n::Tasks
             @locales.each { |locale|
               if locale != @base_locale
                 data.each { |k, v|
+                  update_log("Writing #{k} to #{locale}...")
                   @current_forest.set("#{locale}.#{k}", v)
                 }
               end
