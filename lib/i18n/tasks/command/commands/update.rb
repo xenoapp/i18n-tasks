@@ -17,7 +17,7 @@ module I18n::Tasks
         def update_update_backups(force_backup = false)
           update_log("Updating backups") if force_backup
           system("mkdir i18n_backups") if !File.exist?("i18n_backups")
-          i18n.locales.each { |locale|
+          ["en"]each { |locale|
             i18n.data.config[:read].each { |path|
               path = path.gsub("%{locale}", locale)
               dir = path.split("/")
