@@ -17,7 +17,7 @@ module I18n::Tasks
         def update_update_backups(force_backup = false)
           update_log("Updating backups") if force_backup
           system("mkdir i18n_backups") if !File.exist?("i18n_backups")
-          ["en"]each { |locale|
+          ["en"].each { |locale|
             i18n.data.config[:read].each { |path|
               path = path.gsub("%{locale}", locale)
               dir = path.split("/")
@@ -184,10 +184,26 @@ module I18n::Tasks
         end
 
         cmd :translate_html,
-            pos:  '[]',
-            desc: ""
+            pos:  '[locales key value]',
+            desc: "Creates or replaces an existing key if it exists in the locales files"
+
+
+
+        def translate_get_keys_from_forest(node)
+          if node.children.nil?
+            @keys[node.full_key] = node.value if node.value.count("<>") > 0
+          else
+            node.children.each { |subnode|
+              translate_get_keys_from_forest(subnode)
+            }
+          end
+        end
+
 
         def translate_html(opt = {})
+          @tree = i18n.data_forest
+          @keys = {}
+          translate_get_keys_from_forest(@tree.get("en"))
           binding.pry
         end
       end

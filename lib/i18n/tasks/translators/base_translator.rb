@@ -93,6 +93,7 @@ module I18n::Tasks
         when String
           replace_interpolations value unless value.empty?
         end
+        binding.pry
       end
 
       # Parse translated value from the each_translated enumerator
@@ -115,7 +116,7 @@ module I18n::Tasks
         end
       end
 
-      INTERPOLATION_KEY_RE = /%\{[^}]+}|:.*:|<[^>]+>/
+      INTERPOLATION_KEY_RE = /%\{[^}]+}|:[^ ]*:|<[^>]+>/
       UNTRANSLATABLE_STRING = 'zxzxzx'
 
       # @param [String] value
@@ -124,7 +125,7 @@ module I18n::Tasks
         i = -1
         value.gsub INTERPOLATION_KEY_RE do
           i += 1
-          "#{UNTRANSLATABLE_STRING}#{i}"
+          "#{UNTRANSLATABLE_STRING}#{i} "
         end
       end
 
@@ -134,8 +135,9 @@ module I18n::Tasks
       def restore_interpolations(untranslated, translated)
         return translated if untranslated !~ INTERPOLATION_KEY_RE
         values = untranslated.scan(INTERPOLATION_KEY_RE)
-        translated.gsub(/#{Regexp.escape(UNTRANSLATABLE_STRING)}\d+/i) do |m|
-          values[m[UNTRANSLATABLE_STRING.length..-1].to_i]
+        translated.gsub(/#{Regexp.escape(UNTRANSLATABLE_STRING)}\d+ /i) do |m|
+          puts "> " + m[UNTRANSLATABLE_STRING.length..-2] + ", " + m[UNTRANSLATABLE_STRING.length..-1] + "."
+          values[m[UNTRANSLATABLE_STRING.length..-2].to_i]
         end
       rescue StandardError => e
         raise_interpolation_error(untranslated, translated, e)
