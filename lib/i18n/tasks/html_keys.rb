@@ -12,5 +12,9 @@ module I18n::Tasks
               depluralize_key(split_key(full_key, 2)[1], locale) =~ HTML_KEY_PATTERN)
       # rubocop:enable Style/DoubleNegation
     end
+
+    def html_value?(value, locale)
+      return value.match(/<[^>]+>/)
+    end
   end
 end

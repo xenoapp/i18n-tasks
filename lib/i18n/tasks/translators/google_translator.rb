@@ -16,7 +16,9 @@ module I18n::Tasks::Translators
     protected
 
     def translate_values(list, **options)
-      EasyTranslate.translate(list, options)
+      translated = EasyTranslate.translate(list, options)
+      binding.pry
+      translated
     end
 
     def options_for_translate_values(from:, to:, **options)
