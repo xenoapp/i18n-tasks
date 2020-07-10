@@ -118,26 +118,32 @@ module I18n::Tasks
       end
 
       def get_interpolation_key_regex
-        return /%\{[^}]+}|:[^ ]*:|<[^>]+>|\n|#{Unicode::Emoji::REGEX}/
+        return /%\{[^}]+}|:[^ ]*:|<[^>]+>|\n\r|\n|#{Unicode::Emoji::REGEX}/
       end
 
-      UNTRANSLATABLE_STRING_PREFIX_CHAR = "("
-      UNTRANSLATABLE_STRING_SUFFIX_CHAR = ")"
+      # UNTRANSLATABLE_STRING_PREFIX_CHAR = "("
+      # UNTRANSLATABLE_STRING_SUFFIX_CHAR = ")"
 
-      UNTRANSLATABLE_STRING_PREFIX = "#{UNTRANSLATABLE_STRING_PREFIX_CHAR} "
-      UNTRANSLATABLE_STRING_SUFFIX = " #{UNTRANSLATABLE_STRING_SUFFIX_CHAR}"
+      # UNTRANSLATABLE_STRING_PREFIX = "#{UNTRANSLATABLE_STRING_PREFIX_CHAR} "
+      # UNTRANSLATABLE_STRING_SUFFIX = " #{UNTRANSLATABLE_STRING_SUFFIX_CHAR}"
 
-      UNTRANSLATABLE_STRING_PREFIX_REG = /#{Regexp.escape(UNTRANSLATABLE_STRING_PREFIX_CHAR)} ?/
-      UNTRANSLATABLE_STRING_SUFFIX_REG = / ?#{Regexp.escape(UNTRANSLATABLE_STRING_SUFFIX_CHAR)}/
+      # UNTRANSLATABLE_STRING_PREFIX_REG = /#{Regexp.escape(UNTRANSLATABLE_STRING_PREFIX_CHAR)} ?/
+      # UNTRANSLATABLE_STRING_SUFFIX_REG = / ?#{Regexp.escape(UNTRANSLATABLE_STRING_SUFFIX_CHAR)}/
       UNTRANSLATABLE_STRING = 'zxzxzx'
       UNTRANSLATABLE_STRING_REG = '[zZ][xX][zZ][xX][zZ][xX]'
 
-      def get_untranslatable_string_interpolation_regex(nb = nil)
+      def get_untranslatable_string_interpolation_regex(nb = nil, negative = false)
         if nb.nil?
-          /#{UNTRANSLATABLE_STRING_PREFIX_REG}#{UNTRANSLATABLE_STRING_REG}\d+#{UNTRANSLATABLE_STRING_SUFFIX_REG}/i
+          /#{UNTRANSLATABLE_STRING_REG}#{negative ? /-?/ : //}\d+/i
         else
-          /#{UNTRANSLATABLE_STRING_PREFIX_REG}#{UNTRANSLATABLE_STRING_REG}#{nb}#{UNTRANSLATABLE_STRING_SUFFIX_REG}/i
+          /#{UNTRANSLATABLE_STRING_REG}#{negative ? /-?/ : //}#{nb}/i
         end
+
+        # if nb.nil?
+        #   /#{UNTRANSLATABLE_STRING_PREFIX_REG}#{UNTRANSLATABLE_STRING_REG}\d+#{UNTRANSLATABLE_STRING_SUFFIX_REG}/i
+        # else
+        #   /#{UNTRANSLATABLE_STRING_PREFIX_REG}#{UNTRANSLATABLE_STRING_REG}#{nb}#{UNTRANSLATABLE_STRING_SUFFIX_REG}/i
+        # end
       end
 
       def get_interpolation_spans(value)
@@ -149,7 +155,7 @@ module I18n::Tasks
         spans = []
         indexes.each_with_index { |idx, i|
           if i > 0
-            if indexes[i - 1] + UNTRANSLATABLE_STRING_SUFFIX.length + UNTRANSLATABLE_STRING.length + (i - 1).to_s.length + UNTRANSLATABLE_STRING_PREFIX.length == idx
+            if indexes[i - 1] + UNTRANSLATABLE_STRING.length + (i - 1).to_s.length == idx
               from = i - 1 if from == -1
               to = i
             else
@@ -177,7 +183,7 @@ module I18n::Tasks
       end
 
       def get_interpolation_string(i)
-        "<span translate=\"no\">#{UNTRANSLATABLE_STRING_PREFIX}#{UNTRANSLATABLE_STRING}#{i}#{UNTRANSLATABLE_STRING_SUFFIX}</span>"
+        "#{UNTRANSLATABLE_STRING}#{i}"
       end
 
       # @param [String] value
@@ -185,37 +191,49 @@ module I18n::Tasks
       def replace_interpolations(value, concat_interpolations = true)
         i = -1
 
+        @raw_values = []
         new_value = value.gsub get_interpolation_key_regex do |m|
           i += 1
+          @raw_values.push(m)
           get_interpolation_string(i)
         end
 
         if concat_interpolations == true
           spans = get_interpolation_spans(new_value)
+          @concat_raw_values = []
           spans.each { |span|
-            if span[:from] == span[:to]
-              new_value = new_value.gsub(get_untranslatable_string_interpolation_regex(span[:from]), get_interpolation_string(i))
-            else
-              new_value = new_value.gsub(/#{Regexp.escape(UNTRANSLATABLE_STRING_PREFIX)}#{Regexp.escape(UNTRANSLATABLE_STRING)}#{span[:from]}#{Regexp.escape(UNTRANSLATABLE_STRING_SUFFIX)}.*#{Regexp.escape(UNTRANSLATABLE_STRING_PREFIX)}#{Regexp.escape(UNTRANSLATABLE_STRING)}#{span[:to]}#{Regexp.escape(UNTRANSLATABLE_STRING_SUFFIX)}/, get_interpolation_string(i))
+            tmp = ""
+            (span[:from]..span[:to]).each do |i|
+              tmp += @raw_values[i]
             end
+            @concat_raw_values.push(tmp)
+          }
+
+          spans.each { |span|
             i += 1
+            if span[:from] == span[:to]
+              new_value = new_value.gsub(get_untranslatable_string_interpolation_regex(span[:from]), get_interpolation_string(-1 * i))
+            else
+              new_value = new_value.gsub(/#{Regexp.escape(UNTRANSLATABLE_STRING)}#{span[:from]}.*?#{Regexp.escape(UNTRANSLATABLE_STRING)}#{span[:to]}/, get_interpolation_string(i))
+            end
           }
           i = -1
-          new_value = new_value.gsub(get_untranslatable_string_interpolation_regex) do |m|
+
+          new_value = new_value.gsub(get_untranslatable_string_interpolation_regex(nil, true)) do |m|
             i += 1
-            get_interpolation_string(i)
+            @has_translate_no = true
+            "<span translate=\"no\">#{get_interpolation_string(i)}</span>"
           end
         end
         new_value
       end
 
       def get_member_from_interpolation_regex(m)
-        from_delim =  m.index(UNTRANSLATABLE_STRING_PREFIX).nil? ? UNTRANSLATABLE_STRING_PREFIX_CHAR : UNTRANSLATABLE_STRING_PREFIX
-        to_delim =  m.index(UNTRANSLATABLE_STRING_SUFFIX).nil? ? UNTRANSLATABLE_STRING_SUFFIX_CHAR : UNTRANSLATABLE_STRING_SUFFIX
-        return m[(m.index(from_delim) + from_delim.length)..(-1 * (1 + to_delim.length))].downcase
+        return m[(m.index(UNTRANSLATABLE_STRING))..-8]
       end
 
-      def get_values_from_untranslated(untranslated, translated)
+      def get_values_from_unconcatenated_value(untranslated, translated)
+        translated = restore_code(translated)
         raw_values = untranslated.scan(get_interpolation_key_regex)
         not_concat = replace_interpolations(untranslated, false)
         spans = get_interpolation_spans(not_concat)
@@ -238,28 +256,25 @@ module I18n::Tasks
         return translated if untranslated !~ get_interpolation_key_regex
 
         template = replace_interpolations(untranslated)
-        values = get_values_from_untranslated(untranslated, translated)
-
-        translated = translated.gsub(get_untranslatable_string_interpolation_regex) do |m| get_member_from_interpolation_regex(m) end
-        template = template.gsub(get_untranslatable_string_interpolation_regex) do |m| get_member_from_interpolation_regex(m) end
+        new_translated = translated.gsub(/<span translate=\"no\">#{get_untranslatable_string_interpolation_regex}<\/span>/) do |m| get_member_from_interpolation_regex(m) end
+        template = template.gsub(/<span translate=\"no\">#{get_untranslatable_string_interpolation_regex}<\/span>/) do |m| get_member_from_interpolation_regex(m) end
 
         template.scan(/#{Regexp.escape(UNTRANSLATABLE_STRING)}\d+/i).each { |m|
           template_idx = template.index(m)
-          translated_idx = translated.index(m)
-          puts "#{m}, #{template_idx}, #{translated_idx}"
+          new_translated_idx = new_translated.index(m)
 
-          if translated[translated_idx + m.length] == ' ' && template[template_idx + m.length] != ' '
-            translated = translated[0, translated_idx + m.length] + translated[translated_idx + m.length + 1, translated.length]
-            translated_idx = translated.index(m)
+          if new_translated[new_translated_idx + m.length] == ' ' && template[template_idx + m.length] != ' '
+            new_translated = new_translated[0, new_translated_idx + m.length] + new_translated[new_translated_idx + m.length + 1, new_translated.length]
+            new_translated_idx = new_translated.index(m)
           end
-          if translated[translated_idx - 1] == ' ' && template[template_idx - 1] != ' '
-            translated = translated[0, translated_idx - 1] + translated[translated_idx, translated.length]
+          if new_translated[new_translated_idx - 1] == ' ' && template[template_idx - 1] != ' '
+            new_translated = new_translated[0, new_translated_idx - 1] + new_translated[new_translated_idx, new_translated.length]
           end
         }
-        translated = translated.gsub(/#{Regexp.escape(UNTRANSLATABLE_STRING)}\d+/i) do |m|
-          values[m[UNTRANSLATABLE_STRING.length..-1].to_i]
+        new_translated = new_translated.gsub(/#{Regexp.escape(UNTRANSLATABLE_STRING)}\d+/i) do |m|
+          @concat_raw_values[m[UNTRANSLATABLE_STRING.length..-1].to_i]
         end
-        translated
+        new_translated
       # rescue StandardError => e
       #   raise_interpolation_error(untranslated, translated, e)
       end

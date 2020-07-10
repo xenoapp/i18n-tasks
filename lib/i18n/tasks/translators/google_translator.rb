@@ -17,11 +17,14 @@ module I18n::Tasks::Translators
 
     def translate_values(list, **options)
       translated = EasyTranslate.translate(list, options)
-      binding.pry
       translated
     end
 
     def options_for_translate_values(from:, to:, **options)
+      if @has_translate_no
+        options[:format] = "html"
+        options[:html] = true
+      end
       options.merge(
         api_key: api_key,
         from: to_google_translate_compatible_locale(from),

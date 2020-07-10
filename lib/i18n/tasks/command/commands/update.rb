@@ -167,7 +167,7 @@ module I18n::Tasks
 
         def update(opt = {})
           update_parse_arguments(opt[:arguments])
-          update_update_backups(false)
+          # update_update_backups(false)
           update_get_forests
           update_get_differing_keys
 
@@ -176,7 +176,7 @@ module I18n::Tasks
             update_log("Writing everything back to the files (this will take a while)...")
             i18n.data.write @current_forest
           end
-          update_update_backups(true)
+          # update_update_backups(true)
           if @export_js
             update_log("Running js export (will also take a while)...")
             system("rake i18n:js:export")
