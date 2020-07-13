@@ -121,14 +121,6 @@ module I18n::Tasks
         return /%\{[^}]+}|:[^ ]*:|<[^>]+>|\n\r|\n|#{Unicode::Emoji::REGEX}/
       end
 
-      # UNTRANSLATABLE_STRING_PREFIX_CHAR = "("
-      # UNTRANSLATABLE_STRING_SUFFIX_CHAR = ")"
-
-      # UNTRANSLATABLE_STRING_PREFIX = "#{UNTRANSLATABLE_STRING_PREFIX_CHAR} "
-      # UNTRANSLATABLE_STRING_SUFFIX = " #{UNTRANSLATABLE_STRING_SUFFIX_CHAR}"
-
-      # UNTRANSLATABLE_STRING_PREFIX_REG = /#{Regexp.escape(UNTRANSLATABLE_STRING_PREFIX_CHAR)} ?/
-      # UNTRANSLATABLE_STRING_SUFFIX_REG = / ?#{Regexp.escape(UNTRANSLATABLE_STRING_SUFFIX_CHAR)}/
       UNTRANSLATABLE_STRING = 'zxzxzx'
       UNTRANSLATABLE_STRING_REG = '[zZ][xX][zZ][xX][zZ][xX]'
 
@@ -138,12 +130,6 @@ module I18n::Tasks
         else
           /#{UNTRANSLATABLE_STRING_REG}#{negative ? /-?/ : //}#{nb}/i
         end
-
-        # if nb.nil?
-        #   /#{UNTRANSLATABLE_STRING_PREFIX_REG}#{UNTRANSLATABLE_STRING_REG}\d+#{UNTRANSLATABLE_STRING_SUFFIX_REG}/i
-        # else
-        #   /#{UNTRANSLATABLE_STRING_PREFIX_REG}#{UNTRANSLATABLE_STRING_REG}#{nb}#{UNTRANSLATABLE_STRING_SUFFIX_REG}/i
-        # end
       end
 
       def get_interpolation_spans(value)

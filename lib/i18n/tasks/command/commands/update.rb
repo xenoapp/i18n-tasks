@@ -187,8 +187,6 @@ module I18n::Tasks
             pos:  '[locales key value]',
             desc: "Creates or replaces an existing key if it exists in the locales files"
 
-
-
         def translate_get_html_keys_from_forest(node)
           if node.children.nil?
             @keys[node.full_key] = node.value if node.value.count("<>") > 0
@@ -204,21 +202,23 @@ module I18n::Tasks
           @keys = {}
           translate_get_html_keys_from_forest(@tree.get("en"))
           i18n.locales.each { |locale|
-            if locale != "fr"
+            if locale != "fr" && locale != "en"
+              i = 1
               @keys.each { |k, v|
                 split = k.split(".")
                 split.shift
                 k = ([locale] + split).join(".")
-                puts "#{locale} -> #{k}"
-                @tree.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
+                puts "(#{i} / #{@keys.count})  #{locale} -> #{k}"
+                i += 1
+                @tree.mv_key!(compile_key_pattern(k), '', root: true)
               }
               puts "Rewriting"
               i18n.data.set(locale, @tree.get(locale))
             end
           }
           puts "Translating missing"
-          translated = i18n.translate_forest missing, from: "en", backend: :google
-          @tree.merge! translated
+          # translated = i18n.translate_forest missing, from: "en", backend: :google
+          # @tree.merge! translated
           i18n.data.write @tree
         end
       end
