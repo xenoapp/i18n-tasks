@@ -15,25 +15,27 @@ module I18n::Tasks
       # @return [I18n::Tasks::Tree::Siblings] translated forest
       def translate_forest(forest, from)
         sleep_span = 90
+        error = false
 
         forest = forest.inject @i18n_tasks.empty_forest do |result, root|
-          if root.key != from
+          if root.key != from && error == false
             puts "Translating #{root.key}..."
             retries = 0
             translated = nil
-            # begin
+            begin
               translated = translate_pairs(root.key_values(root: true), to: root.key, from: from)
-            # rescue Exception => e
-            #   if retries > 2
-            #     raise e
-            #   else
-            #     puts "  Got an exception (#{e.message}), sleeping"
-            #     sleep sleep_span
-            #     puts "  Retrying"
-            #     retries += 1
-            #     retry
-            #   end
-            # end
+            rescue Exception => e
+              if retries > 2
+                puts "ERROR: #{e.message}"
+                error = true
+              else
+                puts "  Got an exception (#{e.message}), sleeping"
+                sleep sleep_span
+                puts "  Retrying"
+                retries += 1
+                retry
+              end
+            end
             puts "OK"
             result.merge! Data::Tree::Siblings.from_flat_pairs(translated)
           end

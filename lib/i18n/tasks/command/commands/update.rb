@@ -167,7 +167,7 @@ module I18n::Tasks
 
         def update(opt = {})
           update_parse_arguments(opt[:arguments])
-          # update_update_backups(false)
+          update_update_backups(false)
           update_get_forests
           update_get_differing_keys
 
@@ -183,44 +183,42 @@ module I18n::Tasks
           end
         end
 
-        cmd :translate_html,
-            pos:  '[locales key value]',
-            desc: "Creates or replaces an existing key if it exists in the locales files"
+        # cmd :translate_html,
+        #     pos:  '[locales key value]',
+        #     desc: "Creates or replaces an existing key if it exists in the locales files"
 
-        def translate_get_html_keys_from_forest(node)
-          if node.children.nil?
-            @keys[node.full_key] = node.value if node.value.count("<>") > 0
-          else
-            node.children.each { |subnode|
-              translate_get_html_keys_from_forest(subnode)
-            }
-          end
-        end
+        # def translate_get_html_keys_from_forest(node)
+        #   if node.children.nil?
+        #     @keys[node.full_key] = node.value if node.value.count("<>") > 0
+        #   else
+        #     node.children.each { |subnode|
+        #       translate_get_html_keys_from_forest(subnode)
+        #     }
+        #   end
+        # end
 
-        def translate_html(opt = {})
-          @tree = i18n.data_forest
-          @keys = {}
-          translate_get_html_keys_from_forest(@tree.get("en"))
-          i18n.locales.each { |locale|
-            if locale != "fr" && locale != "en"
-              i = 1
-              @keys.each { |k, v|
-                split = k.split(".")
-                split.shift
-                k = ([locale] + split).join(".")
-                puts "(#{i} / #{@keys.count})  #{locale} -> #{k}"
-                i += 1
-                @tree.mv_key!(compile_key_pattern(k), '', root: true)
-              }
-              puts "Rewriting"
-              i18n.data.set(locale, @tree.get(locale))
-            end
-          }
-          puts "Translating missing"
-          # translated = i18n.translate_forest missing, from: "en", backend: :google
-          # @tree.merge! translated
-          i18n.data.write @tree
-        end
+        # def translate_html(opt = {})
+        #   @tree = i18n.data_forest
+        #   @keys = {}
+        #   translate_get_html_keys_from_forest(@tree.get("en"))
+        #   i18n.locales.each { |locale|
+        #     if locale != "fr" && locale != "en"
+        #       i = 1
+        #       @keys.each { |k, v|
+        #         split = k.split(".")
+        #         split.shift
+        #         k = ([locale] + split).join(".")
+        #         puts "(#{i} / #{@keys.count})  #{locale} -> #{k}"
+        #         i += 1
+        #         @tree.mv_key!(compile_key_pattern(k), '', root: true)
+        #       }
+        #       puts "Rewriting"
+        #       i18n.data.set(locale, @tree.get(locale))
+        #     end
+        #   }
+        #   puts "Writing everything..."
+        #   i18n.data.write @tree
+        # end
       end
     end
   end
