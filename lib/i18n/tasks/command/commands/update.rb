@@ -158,7 +158,7 @@ module I18n::Tasks
         def update_parse_arguments(opt)
           @translate = true
           @base_locale = "en"
-          @export_js = false
+          @export_js = true
           opt.each { |arg|
             split = arg.split("=")
             instance_variable_set("@#{split.first}", split.second == "true" || split.second == "false" ? split.second == "true" : split.second)
@@ -176,7 +176,8 @@ module I18n::Tasks
             update_log("Writing everything back to the files (this will take a while)...")
             i18n.data.write @current_forest
           end
-          # update_update_backups(true)
+          update_log("Updating backup files")
+          update_update_backups(true)
           if @export_js
             update_log("Running js export (will also take a while)...")
             system("rake i18n:js:export")
