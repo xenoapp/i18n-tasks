@@ -17,7 +17,7 @@ module I18n::Tasks
         def update_update_backups(force_backup = false)
           update_log("Updating backups") if force_backup
           system("mkdir i18n_backups") if !File.exist?("i18n_backups")
-          ["en"].each { |locale|
+          ["base"].each { |locale|
             i18n.data.config[:read].each { |path|
               path = path.gsub("%{locale}", locale)
               dir = path.split("/")
@@ -57,93 +57,100 @@ module I18n::Tasks
           @removed = []
           @added = []
           @keys[:current].each { |k, v|
-            cleaned = k.split(".")
-            cleaned.shift
-            @differing.push(cleaned.join(".")) if !@keys[:backup][k].nil? && @keys[:backup][k] != v
+             if !@keys[:base][k].nil? && @keys[:base][k] != v
+              cleaned = k.split(".")
+              cleaned.shift
+              @differing.push(cleaned.join("."))
+            end
           }
-          @keys[:backup].each { |k, v|
-            cleaned = k.split(".")
-            cleaned.shift
-            @removed.push(cleaned.join(".")) if @keys[:current][k].nil?
+          @keys[:base].each { |k, v|
+             if @keys[:current][k].nil?
+              cleaned = k.split(".")
+              cleaned.shift
+              @removed.push(cleaned.join("."))
+            end
           }
           @keys[:current].each { |k, v|
-            cleaned = k.split(".")
-            cleaned.shift
-            @added.push(cleaned.join(".")) if @keys[:backup][k].nil?
+             if @keys[:base][k].nil?
+              cleaned = k.split(".")
+              cleaned.shift
+              @added.push(cleaned.join("."))
+            end
           }
         end
 
         def update_get_differing_keys
           @keys = {
             current: {},
-            backup: {}
+            base: {}
           }
           update_get_keys_from_forest(:current, @current_forest.get(@base_locale))
-          update_get_keys_from_forest(:backup, @backup_forest.get(@base_locale))
+          update_get_keys_from_forest(:base, @backup_forest.get(@base_locale))
           update_check_differences
         end
 
         def update_process_differing_keys
-          @locales = i18n.locales
+          @locales = i18n.locales.select { |l| l != @base_locale }
 
           update_log("Found #{@differing.count} differing keys:")
-          @differing.each { |k|
-            update_log("  - #{k}")
-          }
+          @differing.each { |k| update_log("  - #{k}") }
           update_log("Found #{@added.count} added keys:")
-          @added.each { |k|
-            update_log("  - #{k}")
-          }
+          @added.each { |k| update_log("  - #{k}") }
           update_log("Found #{@removed.count} removed keys:")
-          @removed.each { |k|
-            update_log("  - #{k}")
-          }
+          @removed.each { |k| update_log("  - #{k}") }
           puts ""
 
           if @differing.count > 0 || @removed.count > 0
             i = 0
             @locales.each { |locale|
               i += 1
-              if locale != @base_locale
-                something_changed = false
-                update_log("#{locale} (#{i} / #{@locales.count}):")
-                if @differing.count > 0
-                  update_log("  Removing differing keys...")
-                    @differing.each { |k|
-                    @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
-                    something_changed = true
-                  }
-                end
-                if @removed.count > 0
-                  update_log("  Removing removed keys...")
-                  @removed.each { |k|
-                    @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
-                    something_changed = true
-                  }
-                end
-                if something_changed
-                  update_log("  Rewriting locale after removing...")
-                  i18n.data.set(locale, @current_forest.get(locale))
-                end
+              something_changed = false
+              update_log("#{locale} (#{i} / #{@locales.count}):")
+              if @differing.count > 0
+                update_log("  Removing differing keys...")
+                j = 1
+                @differing.each { |k|
+                  update_log("    #{j} / #{@differing.count} - #{k}")
+                  @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
+                  something_changed = true
+                  j += 1
+                }
+              end
+              if @removed.count > 0
+                update_log("  Removing removed keys...")
+                j = 1
+                @removed.each { |k|
+                  update_log("    #{j} / #{@removed.count} - #{k}")
+                  j += 1
+                  @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
+                  something_changed = true
+                }
+              end
+              if something_changed
+                update_log("  Rewriting locale after removing...")
+                i18n.data.set(locale, @current_forest.get(locale))
               end
             }
           end
           if @translate
-            update_log("Retrieving differing forest (will take a little while")
-            missing = i18n.missing_diff_forest i18n.locales, @base_locale
+            update_log("Retrieving differing forest (will take a little while)")
+
+            data = {}
+            @differing.each { |k| data[k] = @current_forest.get("#{@base_locale}.#{k}") }
+            @added.each { |k| data[k] = @current_forest.get("#{@base_locale}.#{k}") }
+            data.each { |k, v| @current_forest.set("en.#{k}", v) }
+            i18n.data.set("en", @current_forest.get("en"))
+
+            missing = i18n.missing_diff_forest i18n.locales, "en"
             update_log("Adding and translating added keys...")
-            translated = i18n.translate_forest missing, from: @base_locale, backend: :google
+            translated = i18n.translate_forest missing, from: "en", backend: :google
             @current_forest.merge! translated
           else
             update_log("Setting every differing / added key to #{@base_locale}...")
 
             data = {}
-            @differing.each { |k|
-              data[k] = @current_forest.get("en.#{k}")
-            }
-            @added.each { |k|
-              data[k] = @current_forest.get("en.#{k}")
-            }
+            @differing.each { |k| data[k] = @current_forest.get("#{@base_locale}.#{k}") }
+            @added.each { |k| data[k] = @current_forest.get("#{@base_locale}.#{k}") }
             @locales.each { |locale|
               if locale != @base_locale
                 data.each { |k, v|
@@ -157,7 +164,7 @@ module I18n::Tasks
 
         def update_parse_arguments(opt)
           @translate = true
-          @base_locale = "en"
+          @base_locale = "base"
           @export_js = true
           opt.each { |arg|
             split = arg.split("=")
@@ -170,7 +177,6 @@ module I18n::Tasks
           update_update_backups(false)
           update_get_forests
           update_get_differing_keys
-
           if !(@differing.count == 0 && @added.count == 0 && @removed.count == 0)
             update_process_differing_keys
             update_log("Writing everything back to the files (this will take a while)...")
@@ -183,43 +189,6 @@ module I18n::Tasks
             system("rake i18n:js:export")
           end
         end
-
-        # cmd :translate_html,
-        #     pos:  '[locales key value]',
-        #     desc: "Creates or replaces an existing key if it exists in the locales files"
-
-        # def translate_get_html_keys_from_forest(node)
-        #   if node.children.nil?
-        #     @keys[node.full_key] = node.value if node.value.count("<>") > 0
-        #   else
-        #     node.children.each { |subnode|
-        #       translate_get_html_keys_from_forest(subnode)
-        #     }
-        #   end
-        # end
-
-        # def translate_html(opt = {})
-        #   @tree = i18n.data_forest
-        #   @keys = {}
-        #   translate_get_html_keys_from_forest(@tree.get("en"))
-        #   i18n.locales.each { |locale|
-        #     if locale != "fr" && locale != "en"
-        #       i = 1
-        #       @keys.each { |k, v|
-        #         split = k.split(".")
-        #         split.shift
-        #         k = ([locale] + split).join(".")
-        #         puts "(#{i} / #{@keys.count})  #{locale} -> #{k}"
-        #         i += 1
-        #         @tree.mv_key!(compile_key_pattern(k), '', root: true)
-        #       }
-        #       puts "Rewriting"
-        #       i18n.data.set(locale, @tree.get(locale))
-        #     end
-        #   }
-        #   puts "Writing everything..."
-        #   i18n.data.write @tree
-        # end
       end
     end
   end
