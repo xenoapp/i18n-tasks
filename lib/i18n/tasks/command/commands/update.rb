@@ -102,35 +102,30 @@ module I18n::Tasks
 
           if @differing.count > 0 || @removed.count > 0
             i = 0
-            @locales.each { |locale|
+            blocked = !@from.nil?
+
+            update_log("Removing differing keys...")
+            @differing.each { |k|
               i += 1
-              something_changed = false
-              update_log("#{locale} (#{i} / #{@locales.count}):")
-              if @differing.count > 0
-                update_log("  Removing differing keys...")
-                j = 1
-                @differing.each { |k|
-                  update_log("    #{j} / #{@differing.count} - #{k}")
-                  @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
-                  something_changed = true
-                  j += 1
-                }
-              end
-              if @removed.count > 0
-                update_log("  Removing removed keys...")
-                j = 1
-                @removed.each { |k|
-                  update_log("    #{j} / #{@removed.count} - #{k}")
-                  j += 1
-                  @current_forest.mv_key!(compile_key_pattern("#{locale}.#{k}"), '', root: true)
-                  something_changed = true
-                }
-              end
-              if something_changed
-                update_log("  Rewriting locale after removing...")
-                i18n.data.set(locale, @current_forest.get(locale))
-              end
+              update_log("  #{i} / #{@differing.count} - #{k}")
+              @current_forest.mv_key!(compile_key_pattern("#{k}"), '', root: false, except: @base_locale)
             }
+            i = 0
+            update_log("Removing removed keys...")
+            @removed.each { |k|
+              i += 1
+              update_log("  #{i} / #{@removed.count} - #{k}")
+              @current_forest.mv_key!(compile_key_pattern("#{k}"), '', root: false, except: @base_locale)
+            }
+
+            i = 0
+            update_log("Rewriting locales after removing...")
+            i18n.locales.each { |locale|
+              i += 1
+              update_log("  #{i} / #{@i18n.locales.count} - #{locale}")
+              i18n.data.set(locale, @current_forest.get(locale))
+            }
+
           end
           if @translate
             update_log("Retrieving differing forest (will take a little while)")
@@ -166,6 +161,7 @@ module I18n::Tasks
           @translate = true
           @base_locale = "base"
           @export_js = true
+          @from = nil
           opt.each { |arg|
             split = arg.split("=")
             instance_variable_set("@#{split.first}", split.second == "true" || split.second == "false" ? split.second == "true" : split.second)
@@ -177,6 +173,7 @@ module I18n::Tasks
           update_update_backups(false)
           update_get_forests
           update_get_differing_keys
+
           if !(@differing.count == 0 && @added.count == 0 && @removed.count == 0)
             update_process_differing_keys
             update_log("Writing everything back to the files (this will take a while)...")

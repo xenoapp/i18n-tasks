@@ -37,13 +37,13 @@ module I18n::Tasks::Data::Tree
     # @param to_pattern [Regexp]
     # @param root [Boolean]
     # @return {old key => new key}
-    def mv_key!(from_pattern, to_pattern, root: false) # rubocop:disable Metrics/AbcSize,Metrics/MethodLength
+    def mv_key!(from_pattern, to_pattern, root: false, except: nil) # rubocop:disable Metrics/AbcSize,Metrics/MethodLength
       moved_forest = Siblings.new
       moved_nodes = []
       old_key_to_new_key = {}
       nodes do |node|
         full_key = node.full_key(root: root)
-        if from_pattern =~ full_key
+        if from_pattern =~ full_key && (except.nil? ? true : node.attributes[:data][:locale] != except)
           moved_nodes << node
           if to_pattern.empty?
             old_key_to_new_key[full_key] = nil
