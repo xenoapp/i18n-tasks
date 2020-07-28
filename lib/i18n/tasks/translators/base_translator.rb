@@ -18,7 +18,7 @@ module I18n::Tasks
         error = false
 
         forest = forest.inject @i18n_tasks.empty_forest do |result, root|
-          if root.key != from && error == false
+          if root.key != from && error == false && root.key != "base"
             puts "Translating #{root.key}..."
             retries = 0
             translated = nil
