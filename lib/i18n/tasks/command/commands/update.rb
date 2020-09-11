@@ -108,14 +108,14 @@ module I18n::Tasks
             @differing.each { |k|
               i += 1
               update_log("  #{i} / #{@differing.count} - #{k}")
-              @current_forest.mv_key!(compile_key_pattern("#{k}"), '', root: false, except: @base_locale)
+              @current_forest.mv_key!(compile_key_pattern("#{k}"), '', root: false, except: @except)
             }
             i = 0
             update_log("Removing removed keys...")
             @removed.each { |k|
               i += 1
               update_log("  #{i} / #{@removed.count} - #{k}")
-              @current_forest.mv_key!(compile_key_pattern("#{k}"), '', root: false, except: @base_locale)
+              @current_forest.mv_key!(compile_key_pattern("#{k}"), '', root: false, except: @except)
             }
 
             i = 0
@@ -123,7 +123,11 @@ module I18n::Tasks
             i18n.locales.each { |locale|
               i += 1
               update_log("  #{i} / #{@i18n.locales.count} - #{locale}")
-              i18n.data.set(locale, @current_forest.get(locale))
+              if !@except.include?(locale)
+                i18n.data.set(locale, @current_forest.get(locale))
+              else
+                puts "Ignoring #{locale}"
+              end
             }
 
           end
@@ -161,11 +165,15 @@ module I18n::Tasks
           @translate = true
           @base_locale = "base"
           @export_js = true
+          @except = ""
           @from = nil
           opt.each { |arg|
             split = arg.split("=")
             instance_variable_set("@#{split.first}", split.second == "true" || split.second == "false" ? split.second == "true" : split.second)
           }
+          if @except != ""
+            @except = @except.split(", ") + [@base_locale]
+          end
         end
 
         def update(opt = {})

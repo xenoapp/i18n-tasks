@@ -43,7 +43,7 @@ module I18n::Tasks::Data::Tree
       old_key_to_new_key = {}
       nodes do |node|
         full_key = node.full_key(root: root)
-        if from_pattern =~ full_key && (except.nil? ? true : node.attributes[:data][:locale] != except)
+        if from_pattern =~ full_key && (except.nil? ? true : !except.include?(node.attributes[:data][:locale]))
           moved_nodes << node
           if to_pattern.empty?
             old_key_to_new_key[full_key] = nil
