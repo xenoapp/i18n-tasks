@@ -173,6 +173,8 @@ module I18n::Tasks
           }
           if @except != ""
             @except = @except.split(", ") + [@base_locale]
+          else
+            @except = [@base_locale]
           end
         end
 
