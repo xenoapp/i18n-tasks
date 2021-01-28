@@ -123,8 +123,8 @@ module I18n::Tasks
         return /%\{[^}]+}|:[^ ]*:|<[^>]+>|\n\r|\n|#{Unicode::Emoji::REGEX}/
       end
 
-      UNTRANSLATABLE_STRING = 'zxzxzx'
-      UNTRANSLATABLE_STRING_REG = '[zZ][xX][zZ][xX][zZ][xX]'
+      UNTRANSLATABLE_STRING = '%z%x%z%x%z%x%'
+      UNTRANSLATABLE_STRING_REG = '%[zZ]%[xX]%[zZ]%[xX]%[zZ]%[xX]%'
 
       def get_untranslatable_string_interpolation_regex(nb = nil, negative = false)
         if nb.nil?
